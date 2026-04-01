@@ -1,0 +1,18 @@
+{
+  "name": "remoteadmin-v4",
+  "version": "4.0.0",
+  "description": "RemoteAdmin v4 - Remote Administration System",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "build": "node builder.js"
+  },
+  "dependencies": {
+    "ws": "^8.18.0",
+    "otplib": "^12.0.1",
+    "better-sqlite3": "^11.7.0"
+  },
+  "devDependencies": {
+    "pkg": "^5.8.1"
+  }
+}

@@ -1,0 +1,132 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model AdminUser {
+  id            String   @id @default(cuid())
+  username      String   @unique
+  passwordHash  String
+  role          String   @default("viewer") // superadmin, admin, viewer
+  totpSecret    String?
+  totpEnabled   Boolean  @default(false)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+  auditLogs     AuditLog[]
+  ticketReplies TicketReply[]
+
+  settings      AdminSetting[]
+}
+
+model Agent {
+  id            String   @id @default(cuid())
+  hostname      String
+  os            String
+  platform      String
+  ip            String?
+  version       String   @default("1.0.0")
+  lastSeen      DateTime @default(now())
+  status        String   @default("online") // online, offline
+  createdAt     DateTime @default(now())
+  tickets       Ticket[]
+  installations Installation[]
+  metrics       AgentMetric[]
+}
+
+model AgentMetric {
+  id        String   @id @default(cuid())
+  agentId   String
+  agent     Agent    @relation(fields: [agentId], references: [id], onDelete: Cascade)
+  cpu       Float
+  memory    Float
+  diskTotal Float
+  diskUsed  Float
+  uptime    Int
+  timestamp DateTime @default(now())
+}
+
+model StoreApp {
+  id          String   @id @default(cuid())
+  name        String
+  description String   @default("")
+  category    String   @default("General")
+  icon        String   @default("📦")
+  installCmd  String   @default("") // path to local file on server: /app-files/vscode/setup.exe
+  installArgs String   @default("/S") // silent install arguments
+  uninstallCmd String  @default("")
+  platform    String   @default("windows") // windows, linux, both
+  version     String   @default("1.0.0")
+  featured    Boolean  @default(false)
+  fileName    String   @default("") // original uploaded filename
+  fileSize    Int      @default(0) // file size in bytes
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  installations Installation[]
+}
+
+model Installation {
+  id        String   @id @default(cuid())
+  appId     String
+  app       StoreApp @relation(fields: [appId], references: [id], onDelete: Cascade)
+  agentId   String
+  agent     Agent    @relation(fields: [agentId], references: [id], onDelete: Cascade)
+  installedBy String? // admin username who triggered
+  status    String   @default("installed") // installed, failed, uninstalled
+  createdAt DateTime @default(now())
+}
+
+model Ticket {
+  id        String        @id @default(cuid())
+  agentId   String
+  agent     Agent         @relation(fields: [agentId], references: [id], onDelete: Cascade)
+  subject   String
+  message   String
+  status    String        @default("open") // open, in_progress, resolved, closed
+  priority  String        @default("normal") // low, normal, high, critical
+  createdAt DateTime      @default(now())
+  updatedAt DateTime      @updatedAt
+  replies   TicketReply[]
+}
+
+model TicketReply {
+  id        String   @id @default(cuid())
+  ticketId  String
+  ticket    Ticket   @relation(fields: [ticketId], references: [id], onDelete: Cascade)
+  authorId  String?
+  author    AdminUser? @relation(fields: [authorId], references: [id], onDelete: SetNull)
+  isAdmin   Boolean  @default(false)
+  message   String
+  createdAt DateTime @default(now())
+}
+
+model AuditLog {
+  id        String    @id @default(cuid())
+  userId    String
+  user      AdminUser @relation(fields: [userId], references: [id], onDelete: Cascade)
+  action    String
+  detail    String    @default("")
+  ip        String    @default("")
+  createdAt DateTime  @default(now())
+}
+
+model AdminSetting {
+  id    String @id @default(cuid())
+  key   String @unique
+  value String
+  userId String?
+  user  AdminUser? @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model AgentUpdate {
+  id        String   @id @default(cuid())
+  version   String
+  filename  String
+  filePath  String
+  platform  String   @default("windows")
+  fileSize  Int      @default(0)
+  createdAt DateTime @default(now())
+}
