@@ -1585,3 +1585,80 @@ prisma:query SELECT `main`.`AdminUser`.`id`, `main`.`AdminUser`.`username`, `mai
  GET / 200 in 30ms (compile: 3ms, render: 27ms)
  GET / 200 in 29ms (compile: 2ms, render: 26ms)
  GET / 200 in 29ms (compile: 3ms, render: 27ms)
+ GET / 200 in 29ms (compile: 3ms, render: 26ms)
+✓ Compiled in 856ms
+ GET / 200 in 68ms (compile: 44ms, render: 24ms)
+ GET / 200 in 27ms (compile: 3ms, render: 24ms)
+ GET / 200 in 15ms (compile: 3ms, render: 12ms)
+ GET / 200 in 14ms (compile: 2ms, render: 11ms)
+ GET / 200 in 15ms (compile: 2ms, render: 12ms)
+ GET / 200 in 17ms (compile: 2ms, render: 14ms)
+ GET / 200 in 13ms (compile: 2ms, render: 11ms)
+ GET / 200 in 14ms (compile: 2ms, render: 12ms)
+ GET / 200 in 19ms (compile: 2ms, render: 17ms)
+ GET / 200 in 13ms (compile: 2ms, render: 11ms)
+ GET / 200 in 12ms (compile: 2ms, render: 10ms)
+ GET / 200 in 17ms (compile: 2ms, render: 14ms)
+ GET / 200 in 13ms (compile: 2ms, render: 10ms)
+ GET / 200 in 13ms (compile: 2ms, render: 11ms)
+ GET / 200 in 16ms (compile: 1917µs, render: 14ms)
+ GET / 200 in 12ms (compile: 1654µs, render: 10ms)
+ GET / 200 in 12ms (compile: 1903µs, render: 10ms)
+ GET / 200 in 12ms (compile: 1690µs, render: 10ms)
+ GET / 200 in 14ms (compile: 2ms, render: 11ms)
+ GET / 200 in 14ms (compile: 2ms, render: 12ms)
+ GET / 200 in 13ms (compile: 2ms, render: 11ms)
+ GET / 200 in 16ms (compile: 2ms, render: 14ms)
+ GET / 200 in 13ms (compile: 1853µs, render: 11ms)
+ GET / 200 in 13ms (compile: 1838µs, render: 11ms)
+ GET / 200 in 13ms (compile: 2ms, render: 11ms)
+ GET / 200 in 13ms (compile: 2ms, render: 11ms)
+ GET / 200 in 13ms (compile: 2ms, render: 11ms)
+ GET / 200 in 18ms (compile: 2ms, render: 16ms)
+ GET / 200 in 12ms (compile: 1739µs, render: 10ms)
+ GET / 200 in 24ms (compile: 1805µs, render: 22ms)
+ GET / 200 in 14ms (compile: 2ms, render: 12ms)
+ GET / 200 in 12ms (compile: 1657µs, render: 10ms)
+ GET / 200 in 12ms (compile: 2ms, render: 9ms)
+ GET / 200 in 12ms (compile: 1968µs, render: 10ms)
+ GET / 200 in 12ms (compile: 1696µs, render: 10ms)
+ GET / 200 in 11ms (compile: 1653µs, render: 10ms)
+✓ Compiled in 251ms
+prisma:query SELECT 1
+prisma:query SELECT `main`.`AdminUser`.`id`, `main`.`AdminUser`.`username`, `main`.`AdminUser`.`passwordHash`, `main`.`AdminUser`.`role`, `main`.`AdminUser`.`totpSecret`, `main`.`AdminUser`.`totpEnabled`, `main`.`AdminUser`.`createdAt`, `main`.`AdminUser`.`updatedAt` FROM `main`.`AdminUser` WHERE (`main`.`AdminUser`.`username` = ? AND 1=1) LIMIT ? OFFSET ?
+prisma:query INSERT INTO `main`.`AuditLog` (`id`, `userId`, `action`, `detail`, `ip`, `createdAt`) VALUES (?,?,?,?,?,?) RETURNING `id` AS `id`, `userId` AS `userId`, `action` AS `action`, `detail` AS `detail`, `ip` AS `ip`, `createdAt` AS `createdAt`
+ POST /api/auth/login 200 in 42ms (compile: 28ms, render: 14ms)
+prisma:query SELECT 1
+prisma:query SELECT 1
+prisma:query SELECT COUNT(*) AS `_count$_all` FROM (SELECT `main`.`Agent`.`id` FROM `main`.`Agent` WHERE 1=1 LIMIT ? OFFSET ?) AS `sub`
+prisma:query SELECT 1
+prisma:query SELECT COUNT(*) AS `_count$_all` FROM (SELECT `main`.`Agent`.`id` FROM `main`.`Agent` WHERE `main`.`Agent`.`status` = ? LIMIT ? OFFSET ?) AS `sub`
+prisma:query SELECT COUNT(*) AS `_count$_all` FROM (SELECT `main`.`Installation`.`id` FROM `main`.`Installation` WHERE 1=1 LIMIT ? OFFSET ?) AS `sub`
+prisma:query SELECT COUNT(*) AS `_count$_all` FROM (SELECT `main`.`StoreApp`.`id` FROM `main`.`StoreApp` WHERE 1=1 LIMIT ? OFFSET ?) AS `sub`
+prisma:query SELECT COUNT(*) AS `_count$_all` FROM (SELECT `main`.`Ticket`.`id` FROM `main`.`Ticket` WHERE `main`.`Ticket`.`status` IN (?,?) LIMIT ? OFFSET ?) AS `sub`
+prisma:query 
+        SELECT m.cpu, m.memory
+        FROM AgentMetric m
+        INNER JOIN (
+          SELECT agentId, MAX(timestamp) as maxTs
+          FROM AgentMetric
+          GROUP BY agentId
+        ) latest ON m.agentId = latest.agentId AND m.timestamp = latest.maxTs
+      
+prisma:query SELECT `main`.`AuditLog`.`id`, `main`.`AuditLog`.`userId`, `main`.`AuditLog`.`action`, `main`.`AuditLog`.`detail`, `main`.`AuditLog`.`ip`, `main`.`AuditLog`.`createdAt` FROM `main`.`AuditLog` WHERE 1=1 ORDER BY `main`.`AuditLog`.`createdAt` DESC LIMIT ? OFFSET ?
+prisma:query SELECT COUNT(*) AS `_count$_all` FROM (SELECT `main`.`Ticket`.`id` FROM `main`.`Ticket` WHERE 1=1 LIMIT ? OFFSET ?) AS `sub`
+prisma:query SELECT COUNT(`main`.`Ticket`.`status`) AS `_count$status`, `main`.`Ticket`.`status` FROM `main`.`Ticket` WHERE 1=1 GROUP BY `main`.`Ticket`.`status` LIMIT ? OFFSET ?
+prisma:query SELECT `main`.`AdminUser`.`id`, `main`.`AdminUser`.`username`, `main`.`AdminUser`.`role` FROM `main`.`AdminUser` WHERE `main`.`AdminUser`.`id` IN (?) LIMIT ? OFFSET ?
+ GET /api/dashboard 200 in 28ms (compile: 20ms, render: 8ms)
+prisma:query SELECT `main`.`AdminUser`.`id`, `main`.`AdminUser`.`username`, `main`.`AdminUser`.`role`, `main`.`AdminUser`.`totpEnabled`, `main`.`AdminUser`.`createdAt`, `main`.`AdminUser`.`updatedAt`, COALESCE(`aggr_selection_0_AuditLog`.`_aggr_count_auditLogs`, 0) AS `_aggr_count_auditLogs`, COALESCE(`aggr_selection_1_TicketReply`.`_aggr_count_ticketReplies`, 0) AS `_aggr_count_ticketReplies` FROM `main`.`AdminUser` LEFT JOIN (SELECT `main`.`AuditLog`.`userId`, COUNT(*) AS `_aggr_count_auditLogs` FROM `main`.`AuditLog` WHERE 1=1 GROUP BY `main`.`AuditLog`.`userId`) AS `aggr_selection_0_AuditLog` ON (`main`.`AdminUser`.`id` = `aggr_selection_0_AuditLog`.`userId`) LEFT JOIN (SELECT `main`.`TicketReply`.`authorId`, COUNT(*) AS `_aggr_count_ticketReplies` FROM `main`.`TicketReply` WHERE 1=1 GROUP BY `main`.`TicketReply`.`authorId`) AS `aggr_selection_1_TicketReply` ON (`main`.`AdminUser`.`id` = `aggr_selection_1_TicketReply`.`authorId`) WHERE 1=1 ORDER BY `main`.`AdminUser`.`createdAt` ASC LIMIT ? OFFSET ?
+ GET /api/users 200 in 26ms (compile: 20ms, render: 6ms)
+prisma:query SELECT `main`.`AdminSetting`.`id`, `main`.`AdminSetting`.`key`, `main`.`AdminSetting`.`value` FROM `main`.`AdminSetting` WHERE 1=1 LIMIT ? OFFSET ?
+ GET /api/settings 200 in 25ms (compile: 19ms, render: 6ms)
+prisma:query SELECT COUNT(*) AS `_count$_all` FROM (SELECT `main`.`AuditLog`.`id` FROM `main`.`AuditLog` WHERE 1=1 LIMIT ? OFFSET ?) AS `sub`
+prisma:query SELECT `main`.`AuditLog`.`id`, `main`.`AuditLog`.`userId`, `main`.`AuditLog`.`action`, `main`.`AuditLog`.`detail`, `main`.`AuditLog`.`ip`, `main`.`AuditLog`.`createdAt` FROM `main`.`AuditLog` WHERE 1=1 ORDER BY `main`.`AuditLog`.`createdAt` DESC LIMIT ? OFFSET ?
+prisma:query SELECT `main`.`AdminUser`.`id`, `main`.`AdminUser`.`username`, `main`.`AdminUser`.`role` FROM `main`.`AdminUser` WHERE `main`.`AdminUser`.`id` IN (?) LIMIT ? OFFSET ?
+ GET /api/audit?limit=50 200 in 26ms (compile: 19ms, render: 7ms)
+✓ Compiled in 141ms
+✓ Compiled in 231ms
+✓ Compiled in 165ms
+ GET / 200 in 184ms (compile: 47ms, render: 137ms)

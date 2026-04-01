@@ -13,7 +13,7 @@ import {
   Maximize2, MousePointer, Keyboard, Command, Package,
   CheckCircle2, XCircle, Info, TrendingUp, Server, UserPlus, File, Folder,
   Key, Smartphone, QrCode, Copy, ExternalLink, Play,
-  Pause, Square, MousePointerClick
+  Pause, Square, MousePointerClick, ShieldCheck
 } from 'lucide-react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -40,8 +40,20 @@ function LoginView() {
   const [loading, setLoading] = useState(false);
   const [totpRequired, setTotpRequired] = useState(false);
   const [pendingUser, setPendingUser] = useState<any>(null);
+  const [totpError, setTotpError] = useState('');
+  const [totpTimer, setTotpTimer] = useState(30);
   const login = useAppStore((s) => s.login);
   const verify2FA = useAppStore((s) => s.verify2FA);
+
+  // TOTP timer countdown (like Webmin)
+  useEffect(() => {
+    if (!totpRequired) return;
+    setTotpTimer(30 - (Math.floor(Date.now() / 1000) % 30));
+    const interval = setInterval(() => {
+      setTotpTimer(30 - (Math.floor(Date.now() / 1000) % 30));
+    }, 1000);
+    return () => clearInterval(interval);
+  }, [totpRequired]);
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -53,10 +65,12 @@ function LoginView() {
         body: JSON.stringify({ username, password }),
       });
       const data = await res.json();
-      if (!res.ok) { toast.error('Неверные учетные данные'); setLoading(false); return; }
+      if (!res.ok) { toast.error('Неверные учётные данные'); setLoading(false); return; }
       if (data.requires2FA) {
         setTotpRequired(true);
         setPendingUser(data);
+        setTotpCode('');
+        setTotpError('');
       } else {
         login({ id: data.userId, username: data.username, role: data.role, totpEnabled: data.totpEnabled, createdAt: '' }, false);
         toast.success('Добро пожаловать!');
@@ -69,6 +83,7 @@ function LoginView() {
     e.preventDefault();
     if (!pendingUser) return;
     setLoading(true);
+    setTotpError('');
     try {
       const res = await fetch('/api/auth/totp', {
         method: 'POST',
@@ -76,73 +91,433 @@ function LoginView() {
         body: JSON.stringify({ userId: pendingUser.userId, code: totpCode }),
       });
       const data = await res.json();
-      if (!res.ok) { toast.error('Неверный код TOTP'); setLoading(false); return; }
+      if (!res.ok) { setTotpError('Неверный код. Попробуйте снова.'); setLoading(false); return; }
       verify2FA();
-      toast.success('Аутентификация успешна!');
-    } catch { toast.error('Ошибка'); }
+      toast.success(data.usedBackupCode ? `Вход с помощью резервного кода (осталось: ${data.remainingBackupCodes})` : 'Аутентификация успешна!');
+    } catch { setTotpError('Ошибка подключения'); }
     setLoading(false);
   };
 
+  const timerPercent = (totpTimer / 30) * 100;
+  const timerColor = totpTimer <= 5 ? 'text-red-400' : totpTimer <= 10 ? 'text-amber-400' : 'text-emerald-400';
+
   return (
     <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 p-4">
-      <div className="w-full max-w-md">
+      <div className="w-full max-w-[420px]">
         <div className="text-center mb-8">
-          <div className="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-primary mb-4">
-            <Shield className="w-8 h-8 text-primary-foreground" />
+          <div className="inline-flex items-center justify-center w-20 h-20 rounded-2xl bg-primary mb-4 shadow-lg shadow-primary/20">
+            <Shield className="w-10 h-10 text-primary-foreground" />
           </div>
-          <h1 className="text-3xl font-bold text-white">RemoteAdmin</h1>
-          <p className="text-slate-400 mt-1">Панель управления v4.0</p>
+          <h1 className="text-3xl font-bold text-white tracking-tight">RemoteAdmin</h1>
+          <p className="text-slate-400 mt-1 text-sm">Панель управления v4.0</p>
         </div>
-        <Card className="border-slate-700 bg-slate-800/50 backdrop-blur">
+        <Card className="border-slate-700/50 bg-slate-800/60 backdrop-blur-xl shadow-2xl">
           <CardContent className="pt-6">
             {!totpRequired ? (
-              <form onSubmit={handleLogin} className="space-y-4">
+              <form onSubmit={handleLogin} className="space-y-5">
                 <div className="space-y-2">
-                  <Label className="text-slate-300">Имя пользователя</Label>
-                  <Input value={username} onChange={(e) => setUsername(e.target.value)} placeholder="admin" className="bg-slate-900 border-slate-600 text-white" required />
+                  <Label className="text-slate-300 text-sm font-medium">Имя пользователя</Label>
+                  <div className="relative">
+                    <Users className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500" />
+                    <Input value={username} onChange={(e) => setUsername(e.target.value)} placeholder="admin" className="bg-slate-900/80 border-slate-600/50 text-white pl-10 h-11 focus:border-primary/50 transition-colors" required />
+                  </div>
                 </div>
                 <div className="space-y-2">
-                  <Label className="text-slate-300">Пароль</Label>
+                  <Label className="text-slate-300 text-sm font-medium">Пароль</Label>
                   <div className="relative">
-                    <Input value={password} onChange={(e) => setPassword(e.target.value)} type={showPassword ? 'text' : 'password'} placeholder="••••••••" className="bg-slate-900 border-slate-600 text-white pr-10" required />
-                    <button type="button" onClick={() => setShowPassword(!showPassword)} className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-white">
+                    <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500" />
+                    <Input value={password} onChange={(e) => setPassword(e.target.value)} type={showPassword ? 'text' : 'password'} placeholder="••••••••" className="bg-slate-900/80 border-slate-600/50 text-white pl-10 pr-10 h-11 focus:border-primary/50 transition-colors" required />
+                    <button type="button" onClick={() => setShowPassword(!showPassword)} className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-500 hover:text-slate-300 transition-colors">
                       {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
                     </button>
                   </div>
                 </div>
-                <Button type="submit" className="w-full" disabled={loading}>
-                  {loading ? <RefreshCw className="w-4 h-4 animate-spin mr-2" /> : null}
-                  Войти
+                <Button type="submit" className="w-full h-11 font-semibold" disabled={loading}>
+                  {loading ? <RefreshCw className="w-4 h-4 animate-spin mr-2" /> : <Key className="w-4 h-4 mr-2" />}
+                  Войти в систему
                 </Button>
-                <p className="text-center text-xs text-slate-500 mt-4">Демо: admin / admin123</p>
+                <div className="flex items-center justify-center gap-2 pt-1">
+                  <div className="h-px flex-1 bg-slate-700/50" />
+                  <span className="text-xs text-slate-500">Демо: admin / admin123</span>
+                  <div className="h-px flex-1 bg-slate-700/50" />
+                </div>
               </form>
             ) : (
-              <form onSubmit={handleTotp} className="space-y-4">
-                <div className="text-center mb-4">
-                  <div className="inline-flex items-center justify-center w-12 h-12 rounded-full bg-blue-500/20 mb-2">
-                    <Smartphone className="w-6 h-6 text-blue-400" />
+              <form onSubmit={handleTotp} className="space-y-5">
+                {/* Webmin-style TOTP header with timer */}
+                <div className="text-center space-y-3">
+                  <div className="inline-flex items-center justify-center w-14 h-14 rounded-full bg-primary/10 border border-primary/20">
+                    <Smartphone className="w-7 h-7 text-primary" />
                   </div>
-                  <h3 className="text-lg font-semibold text-white">Двухфакторная аутентификация</h3>
-                  <p className="text-sm text-slate-400">Введите код из приложения-аутентификатора</p>
+                  <div>
+                    <h3 className="text-lg font-semibold text-white">Двухфакторная аутентификация</h3>
+                    <p className="text-sm text-slate-400 mt-1">Введите 6-значный код из приложения-аутентификатора</p>
+                  </div>
+                  {/* Circular timer */}
+                  <div className="flex items-center justify-center gap-3 mt-2">
+                    <div className={`relative w-10 h-10 ${timerColor}`}>
+                      <svg className="w-10 h-10 -rotate-90" viewBox="0 0 36 36">
+                        <path d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831" fill="none" stroke="currentColor" strokeOpacity="0.15" strokeWidth="3" />
+                        <path d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831" fill="none" stroke="currentColor" strokeWidth="3" strokeDasharray={`${timerPercent}, 100`} strokeLinecap="round" />
+                      </svg>
+                      <span className="absolute inset-0 flex items-center justify-center text-xs font-bold">{totpTimer}</span>
+                    </div>
+                    <span className="text-xs text-slate-500">секунд до нового кода</span>
+                  </div>
                 </div>
+
+                {/* 6-digit code input with individual boxes (Webmin style) */}
                 <div className="space-y-2">
-                  <Label className="text-slate-300">TOTP код</Label>
-                  <Input value={totpCode} onChange={(e) => setTotpCode(e.target.value)} placeholder="000000" maxLength={6} className="bg-slate-900 border-slate-600 text-white text-center text-2xl tracking-[0.5em]" required />
+                  <div className="flex gap-2 justify-center">
+                    {[0,1,2,3,4,5].map(i => (
+                      <input
+                        key={i}
+                        type="text"
+                        inputMode="numeric"
+                        maxLength={1}
+                        value={totpCode[i] || ''}
+                        onChange={(e) => {
+                          const val = e.target.value.replace(/\D/g, '');
+                          const newCode = totpCode.split('');
+                          newCode[i] = val;
+                          const final = newCode.join('').slice(0, 6);
+                          setTotpCode(final);
+                          if (val && i < 5) {
+                            const next = e.target.nextElementSibling as HTMLInputElement;
+                            if (next) next.focus();
+                          }
+                        }}
+                        onKeyDown={(e) => {
+                          if (e.key === 'Backspace' && !totpCode[i] && i > 0) {
+                            const prev = (e.target.previousElementSibling as HTMLInputElement);
+                            if (prev) prev.focus();
+                          }
+                        }}
+                        className={`w-11 h-14 text-center text-xl font-bold bg-slate-900/80 border rounded-lg text-white focus:outline-none focus:ring-2 transition-all ${totpError ? 'border-red-500/50 focus:ring-red-500/30' : 'border-slate-600/50 focus:border-primary/50 focus:ring-primary/20'}`}
+                      />
+                    ))}
+                  </div>
+                  {totpError && (
+                    <p className="text-center text-sm text-red-400 flex items-center justify-center gap-1">
+                      <XCircle className="w-3.5 h-3.5" />{totpError}
+                    </p>
+                  )}
                 </div>
-                <Button type="submit" className="w-full" disabled={loading || totpCode.length !== 6}>
-                  {loading ? <RefreshCw className="w-4 h-4 animate-spin mr-2" /> : null}
+
+                <Button type="submit" className="w-full h-11 font-semibold" disabled={loading || totpCode.length !== 6}>
+                  {loading ? <RefreshCw className="w-4 h-4 animate-spin mr-2" /> : <CheckCircle2 className="w-4 h-4 mr-2" />}
                   Подтвердить
                 </Button>
-                <button type="button" onClick={() => { setTotpRequired(false); setPendingUser(null); }} className="w-full text-sm text-slate-400 hover:text-white text-center">
-                  Назад к входу
-                </button>
+
+                <div className="space-y-2">
+                  <div className="flex items-center justify-center gap-2">
+                    <div className="h-px flex-1 bg-slate-700/50" />
+                    <span className="text-xs text-slate-500">или</span>
+                    <div className="h-px flex-1 bg-slate-700/50" />
+                  </div>
+                  <button type="button" onClick={() => { setTotpRequired(false); setPendingUser(null); setTotpError(''); }} className="w-full text-sm text-slate-400 hover:text-white text-center py-1 transition-colors">
+                    ← Назад к вводу пароля
+                  </button>
+                </div>
               </form>
             )}
           </CardContent>
         </Card>
+        <p className="text-center text-xs text-slate-600 mt-6">RemoteAdmin v4.0 · Удалённое администрирование</p>
       </div>
     </div>
   );
+}
+
+/* ─── TOTP Setup Card (Webmin style) ─────────────────── */
+function TOTPSetupCard() {
+  const currentUser = useAppStore((s) => s.currentUser);
+  const [step, setStep] = useState<'idle' | 'scan' | 'verify' | 'done' | 'disable-confirm' | 'disable-verify'>(currentUser?.totpEnabled ? 'done' : 'idle');
+  const [qrImage, setQrImage] = useState('');
+  const [secret, setSecret] = useState('');
+  const [backupCodes, setBackupCodes] = useState<string[]>([]);
+  const [verifyCode, setVerifyCode] = useState('');
+  const [disableCode, setDisableCode] = useState('');
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState('');
+
+  const startSetup = async () => {
+    setLoading(true);
+    setError('');
+    try {
+      const res = await fetch('/api/auth/setup-totp', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ userId: currentUser?.id }) });
+      const data = await res.json();
+      if (!res.ok) { setError(data.error || 'Ошибка'); return; }
+      setSecret(data.secret);
+      // Generate QR image
+      const qrRes = await fetch('/api/auth/qr', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ uri: data.uri }) });
+      const qrData = await qrRes.json();
+      setQrImage(qrData.qr);
+      setBackupCodes(data.backupCodes || []);
+      setStep('scan');
+    } catch { setError('Ошибка подключения'); }
+    setLoading(false);
+  };
+
+  const confirmSetup = async () => {
+    if (verifyCode.length !== 6) return;
+    setLoading(true);
+    setError('');
+    try {
+      const res = await fetch('/api/auth/setup-totp', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ userId: currentUser?.id, code: verifyCode }) });
+      const data = await res.json();
+      if (!res.ok) { setError('Неверный код. Попробуйте снова.'); setLoading(false); return; }
+      setBackupCodes(data.backupCodes || backupCodes);
+      setStep('done');
+      toast.success('Двухфакторная аутентификация включена!');
+    } catch { setError('Ошибка'); }
+    setLoading(false);
+  };
+
+  const startDisable = () => { setDisableCode(''); setError(''); setStep('disable-confirm'); };
+  const confirmDisable = async () => {
+    if (disableCode.length !== 6) return;
+    setLoading(true);
+    setError('');
+    try {
+      const res = await fetch('/api/auth/setup-totp', { method: 'DELETE', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ userId: currentUser?.id, code: disableCode }) });
+      if (!res.ok) { setError('Неверный код'); setLoading(false); return; }
+      setStep('idle');
+      toast.success('2FA отключена');
+    } catch { setError('Ошибка'); }
+    setLoading(false);
+  };
+
+  const copySecret = () => { navigator.clipboard.writeText(secret); toast.success('Секрет скопирован'); };
+  const copyBackupCodes = () => { navigator.clipboard.writeText(backupCodes.join('\n')); toast.success('Коды скопированы'); };
+  const downloadBackupCodes = () => {
+    const text = `RemoteAdmin v4 — Резервные коды\nПользователь: ${currentUser?.username}\nДата: ${new Date().toLocaleString('ru')}\n\n${backupCodes.map((c, i) => `${i + 1}. ${c}`).join('\n')}\n\n⚠ Сохраните эти коды в безопасном месте. Каждый код одноразовый.`;
+    const blob = new Blob([text], { type: 'text/plain' });
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = 'remoteadmin-backup-codes.txt';
+    a.click();
+  };
+
+  // ── Idle state (2FA disabled)
+  if (step === 'idle') {
+    return (
+      <Card className="border-amber-500/20 bg-amber-500/5">
+        <CardHeader className="flex flex-row items-center gap-4 space-y-0 pb-3">
+          <div className="w-12 h-12 rounded-xl bg-amber-500/10 flex items-center justify-center flex-shrink-0">
+            <Shield className="w-6 h-6 text-amber-500" />
+          </div>
+          <div className="flex-1">
+            <CardTitle className="text-base">Двухфакторная аутентификация (2FA)</CardTitle>
+            <CardDescription className="text-xs mt-0.5">TOTP — повышенная безопасность аккаунта</CardDescription>
+          </div>
+          <Badge variant="outline" className="text-amber-500 border-amber-500/30">Отключено</Badge>
+        </CardHeader>
+        <CardContent>
+          <p className="text-sm text-muted-foreground mb-4">
+            Двухфакторная аутентификация требует ввода кода из приложения-аутентификатора при каждом входе,
+            что значительно повышает безопасность вашей учётной записи.
+          </p>
+          <div className="flex flex-wrap gap-3">
+            <Button onClick={startSetup} disabled={loading}>
+              <QrCode className="w-4 h-4 mr-2" />
+              {loading ? 'Генерация...' : 'Включить 2FA'}
+            </Button>
+            <div className="flex items-center gap-2 text-xs text-muted-foreground">
+              <Smartphone className="w-3.5 h-3.5" />
+              <span>Требуется Google Authenticator, Authy или подобное приложение</span>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+    );
+  }
+
+  // ── Scan QR state
+  if (step === 'scan') {
+    return (
+      <Card className="border-primary/20">
+        <CardHeader className="text-center pb-2">
+          <CardTitle className="text-base flex items-center justify-center gap-2">
+            <QrCode className="w-5 h-5 text-primary" />
+            Шаг 1 — Сканируйте QR-код
+          </CardTitle>
+          <CardDescription className="text-xs">Откройте приложение-аутентификатор и отсканируйте код</CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="flex justify-center">
+            {qrImage ? (
+              <div className="bg-white p-4 rounded-xl inline-block">
+                <img src={qrImage} alt="QR Code" className="w-56 h-56" />
+              </div>
+            ) : (
+              <div className="w-56 h-56 bg-muted rounded-xl flex items-center justify-center"><RefreshCw className="w-6 h-6 animate-spin text-muted-foreground" /></div>
+            )}
+          </div>
+          {/* Manual entry */}
+          <div className="bg-muted/50 rounded-lg p-3 space-y-2">
+            <div className="flex items-center justify-between">
+              <p className="text-xs font-medium text-muted-foreground">Если не можете отсканировать, введите секрет вручную:</p>
+              <button onClick={copySecret} className="text-xs text-primary hover:underline flex items-center gap-1"><Copy className="w-3 h-3" />Копировать</button>
+            </div>
+            <code className="block text-center text-sm font-mono tracking-widest select-all bg-background rounded px-3 py-2 border">{secret}</code>
+          </div>
+          <div className="flex justify-center gap-3">
+            <Button variant="outline" onClick={() => setStep('idle')}>Отмена</Button>
+            <Button onClick={() => { setVerifyCode(''); setError(''); setStep('verify'); }}>
+              Далее <ChevronRight className="w-4 h-4 ml-1" />
+            </Button>
+          </div>
+        </CardContent>
+      </Card>
+    );
+  }
+
+  // ── Verify code state
+  if (step === 'verify') {
+    return (
+      <Card className="border-primary/20">
+        <CardHeader className="text-center pb-2">
+          <CardTitle className="text-base flex items-center justify-center gap-2">
+            <Check className="w-5 h-5 text-primary" />
+            Шаг 2 — Подтвердите настройку
+          </CardTitle>
+          <CardDescription className="text-xs">Введите 6-значный код из приложения-аутентификатора</CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="flex justify-center">
+            <div className="flex gap-2">
+              {[0,1,2,3,4,5].map(i => (
+                <input
+                  key={i}
+                  type="text" inputMode="numeric" maxLength={1}
+                  value={verifyCode[i] || ''}
+                  onChange={(e) => {
+                    const val = e.target.value.replace(/\D/g, '');
+                    const arr = verifyCode.split('');
+                    arr[i] = val;
+                    const final = arr.join('').slice(0, 6);
+                    setVerifyCode(final);
+                    if (val && i < 5) { const next = e.target.nextElementSibling as HTMLInputElement; if (next) next.focus(); }
+                  }}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Backspace' && !verifyCode[i] && i > 0) { const prev = e.target.previousElementSibling as HTMLInputElement; if (prev) prev.focus(); }
+                  }}
+                  className={`w-10 h-12 text-center text-lg font-bold bg-background border rounded-lg focus:outline-none focus:ring-2 ${error ? 'border-red-500/50 focus:ring-red-500/30' : 'border-border focus:border-primary/50 focus:ring-primary/20'}`}
+                />
+              ))}
+            </div>
+          </div>
+          {error && <p className="text-center text-sm text-red-400">{error}</p>}
+          <div className="flex justify-center gap-3">
+            <Button variant="outline" onClick={() => setStep('scan')}>Назад</Button>
+            <Button onClick={confirmSetup} disabled={loading || verifyCode.length !== 6}>
+              {loading ? <RefreshCw className="w-4 h-4 animate-spin mr-2" /> : <CheckCircle2 className="w-4 h-4 mr-2" />}
+              Подтвердить и включить
+            </Button>
+          </div>
+        </CardContent>
+      </Card>
+    );
+  }
+
+  // ── Done state (2FA enabled)
+  if (step === 'done') {
+    return (
+      <Card className="border-emerald-500/20 bg-emerald-500/5">
+        <CardHeader className="flex flex-row items-center gap-4 space-y-0 pb-3">
+          <div className="w-12 h-12 rounded-xl bg-emerald-500/10 flex items-center justify-center flex-shrink-0">
+            <ShieldCheck className="w-6 h-6 text-emerald-500" />
+          </div>
+          <div className="flex-1">
+            <CardTitle className="text-base">Двухфакторная аутентификация</CardTitle>
+            <CardDescription className="text-xs mt-0.5">Аккаунт защищён · Требуется код при каждом входе</CardDescription>
+          </div>
+          <Badge className="bg-emerald-500/15 text-emerald-500 border-emerald-500/30 hover:bg-emerald-500/20">Активна</Badge>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          {/* Backup codes warning */}
+          {backupCodes.length > 0 && (
+            <div className="bg-amber-500/10 border border-amber-500/20 rounded-lg p-4 space-y-3">
+              <div className="flex items-center gap-2">
+                <AlertTriangle className="w-4 h-4 text-amber-500 flex-shrink-0" />
+                <p className="text-sm font-medium text-amber-500">Сохраните резервные коды!</p>
+              </div>
+              <p className="text-xs text-muted-foreground">
+                Если вы потеряете доступ к приложению-аутентификатору, эти одноразовые коды позволят вам войти в систему.
+                Каждый код может быть использован только один раз.
+              </p>
+              <div className="grid grid-cols-2 gap-2">
+                {backupCodes.map((code, i) => (
+                  <div key={i} className="bg-background/80 rounded px-3 py-1.5 font-mono text-sm text-center">{code}</div>
+                ))}
+              </div>
+              <div className="flex gap-2">
+                <Button variant="outline" size="sm" onClick={copyBackupCodes}>
+                  <Copy className="w-3.5 h-3.5 mr-1" />Копировать
+                </Button>
+                <Button variant="outline" size="sm" onClick={downloadBackupCodes}>
+                  <Download className="w-3.5 h-3.5 mr-1" />Скачать .txt
+                </Button>
+              </div>
+            </div>
+          )}
+          <div className="flex justify-end">
+            <Button variant="outline" size="sm" className="text-red-500 hover:text-red-600 hover:bg-red-500/10" onClick={startDisable}>
+              <XCircle className="w-4 h-4 mr-1" />Отключить 2FA
+            </Button>
+          </div>
+        </CardContent>
+      </Card>
+    );
+  }
+
+  // ── Disable confirm
+  if (step === 'disable-confirm') {
+    return (
+      <Card className="border-red-500/20">
+        <CardHeader className="text-center pb-2">
+          <CardTitle className="text-base text-red-500 flex items-center justify-center gap-2">
+            <AlertTriangle className="w-5 h-5" />
+            Отключить двухфакторную аутентификацию?
+          </CardTitle>
+          <CardDescription className="text-xs">Это снизит безопасность вашего аккаунта</CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="flex justify-center">
+            <div className="flex gap-2">
+              {[0,1,2,3,4,5].map(i => (
+                <input
+                  key={i}
+                  type="text" inputMode="numeric" maxLength={1}
+                  value={disableCode[i] || ''}
+                  onChange={(e) => {
+                    const val = e.target.value.replace(/\D/g, '');
+                    const arr = disableCode.split('');
+                    arr[i] = val;
+                    setDisableCode(arr.join('').slice(0, 6));
+                    if (val && i < 5) { const next = e.target.nextElementSibling as HTMLInputElement; if (next) next.focus(); }
+                  }}
+                  className={`w-10 h-12 text-center text-lg font-bold bg-background border rounded-lg focus:outline-none focus:ring-2 ${error ? 'border-red-500/50 focus:ring-red-500/30' : 'border-border focus:border-red-500/50 focus:ring-red-500/20'}`}
+                />
+              ))}
+            </div>
+          </div>
+          <p className="text-xs text-center text-muted-foreground">Введите текущий TOTP код для подтверждения</p>
+          {error && <p className="text-center text-sm text-red-400">{error}</p>}
+          <div className="flex justify-center gap-3">
+            <Button variant="outline" onClick={() => { setStep('done'); setError(''); }}>Отмена</Button>
+            <Button variant="destructive" onClick={confirmDisable} disabled={loading || disableCode.length !== 6}>
+              {loading ? <RefreshCw className="w-4 h-4 animate-spin mr-2" /> : null}
+              Отключить 2FA
+            </Button>
+          </div>
+        </CardContent>
+      </Card>
+    );
+  }
+
+  return null;
 }
 
 /* ─── Sidebar ────────────────────────────────────────────── */
@@ -1213,6 +1588,8 @@ function SettingsView() {
 
         {/* Security Tab */}
         <TabsContent value="security" className="space-y-4">
+          {/* Two-Factor Authentication — Webmin style */}
+          <TOTPSetupCard />
           <div className="grid gap-4">
             <Card>
               <CardHeader><CardTitle className="text-base">Защита от перебора</CardTitle></CardHeader>

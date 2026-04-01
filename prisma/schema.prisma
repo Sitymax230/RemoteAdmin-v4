@@ -14,6 +14,7 @@ model AdminUser {
   role          String   @default("viewer") // superadmin, admin, viewer
   totpSecret    String?
   totpEnabled   Boolean  @default(false)
+  backupCodes   String   @default("") // JSON array of backup codes
   createdAt     DateTime @default(now())
   updatedAt     DateTime @updatedAt
   auditLogs     AuditLog[]
