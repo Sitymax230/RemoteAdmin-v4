@@ -1579,3 +1579,9 @@ prisma:query SELECT `main`.`AdminUser`.`id`, `main`.`AdminUser`.`username`, `mai
 ✓ Compiled in 212ms
  GET / 200 in 45ms (compile: 4ms, render: 40ms)
  GET / 200 in 29ms (compile: 2ms, render: 27ms)
+ GET / 200 in 31ms (compile: 2ms, render: 28ms)
+ GET / 200 in 29ms (compile: 2ms, render: 27ms)
+ GET / 200 in 28ms (compile: 2ms, render: 26ms)
+ GET / 200 in 30ms (compile: 3ms, render: 27ms)
+ GET / 200 in 29ms (compile: 2ms, render: 26ms)
+ GET / 200 in 29ms (compile: 3ms, render: 27ms)
