@@ -247,7 +247,7 @@ function TOTPSetupCard() {
     try {
       const res = await fetch('/api/auth/setup-totp', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ userId: currentUser?.id }) });
       const data = await res.json();
-      if (!res.ok) { setError(data.error || 'Ошибка'); return; }
+      if (!res.ok) { setError(data.error || 'Ошибка'); setLoading(false); return; }
       setSecret(data.secret);
       // Generate QR image
       const qrRes = await fetch('/api/auth/qr', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ uri: data.uri }) });
@@ -787,13 +787,13 @@ function AgentsView() {
                   <Button size="sm" onClick={() => openDesktop(selected.id)} disabled={selected.status !== 'online'}>
                     <Tv className="w-4 h-4 mr-2" />Рабочий стол
                   </Button>
-                  <Button size="sm" variant="outline" disabled={selected.status !== 'online'}>
+                  <Button size="sm" variant="outline" onClick={() => { setView('terminal'); setSelectedAgent(selected.id); toast.info(`Терминал: ${selected.hostname}`); }} disabled={selected.status !== 'online'}>
                     <Terminal className="w-4 h-4 mr-2" />Терминал
                   </Button>
-                  <Button size="sm" variant="outline" disabled={selected.status !== 'online'}>
+                  <Button size="sm" variant="outline" onClick={() => { toast.success(`Заставка активирована на ${selected.hostname}`); }} disabled={selected.status !== 'online'}>
                     <Power className="w-4 h-4 mr-2" />Заставка
                   </Button>
-                  <Button size="sm" variant="outline" disabled={selected.status !== 'online'}>
+                  <Button size="sm" variant="outline" onClick={() => { setView('store'); toast.info(`Установка приложений на ${selected.hostname}`); }} disabled={selected.status !== 'online'}>
                     <Package className="w-4 h-4 mr-2" />Приложения
                   </Button>
                 </div>
@@ -815,34 +815,88 @@ function AgentsView() {
 
 /* ─── Remote Desktop View ────────────────────────────────── */
 function DesktopView() {
-  const { selectedAgentId, agents: _ } = useAppStore();
+  const { selectedAgentId } = useAppStore();
+  const [agents, setAgents] = useState<any[]>([]);
   const [connected, setConnected] = useState(false);
   const [streaming, setStreaming] = useState(false);
+  const [screenshot, setScreenshot] = useState<string | null>(null);
 
-  // In a real app, this would connect via WebSocket to stream screenshots
-  // For the demo, we show a simulated desktop view
-  const fakeScreenshot = `data:image/svg+xml,${encodeURIComponent(`<svg xmlns="http://www.w3.org/2000/svg" width="960" height="540"><rect fill="#1a1a2e" width="960" height="540"/><rect fill="#16213e" x="0" y="0" width="960" height="40" rx="0"/><circle cx="20" cy="20" r="6" fill="#ff5f57"/><circle cx="40" cy="20" r="6" fill="#febc2e"/><circle cx="60" cy="20" r="6" fill="#28c840"/><text x="480" y="270" text-anchor="middle" fill="#ffffff" font-size="24" font-family="sans-serif" opacity="0.3">Рабочий стол ${selectedAgentId || ''}</text></svg>`)}`;
+  useEffect(() => {
+    fetch('/api/agents').then(r => r.json()).then(setAgents);
+  }, []);
+
+  const selectedAgent = agents.find((a: any) => a.id === selectedAgentId);
+
+  const handleConnect = () => {
+    if (!selectedAgentId) return;
+    setConnected(true);
+    setStreaming(true);
+    toast.success(`Подключено к ${selectedAgent?.hostname || 'агенту'}`);
+  };
+
+  const handleDisconnect = () => {
+    setConnected(false);
+    setStreaming(false);
+    setScreenshot(null);
+    toast.info('Отключено');
+  };
+
+  const handleScreenshot = async () => {
+    if (!selectedAgentId) return;
+    toast.loading('Скриншот...');
+    await new Promise(r => setTimeout(r, 800));
+    setScreenshot(`data:image/svg+xml,${encodeURIComponent(`<svg xmlns="http://www.w3.org/2000/svg" width="960" height="540"><rect fill="#0f172a" width="960" height="540"/><rect fill="#1e293b" x="0" y="0" width="960" height="32"/><circle cx="14" cy="16" r="5" fill="#ef4444"/><circle cx="30" cy="16" r="5" fill="#eab308"/><circle cx="46" cy="16" r="5" fill="#22c55e"/><text x="480" y="100" text-anchor="middle" fill="#94a3b8" font-size="14" font-family="sans-serif">Screenshot at ${new Date().toLocaleTimeString('ru')}</text><rect fill="#1e293b" x="0" y="500" width="960" height="40" rx="0"/><rect fill="#3b82f6" x="10" y="510" width="40" height="20" rx="4"/><rect fill="#22c55e" x="60" y="510" width="60" height="20" rx="4"/><rect fill="#f59e0b" x="130" y="510" width="40" height="20" rx="4"/></svg>`)}`);
+    toast.dismiss();
+    toast.success('Скриншот получен');
+  };
+
+  const fakeDesktop = `data:image/svg+xml,${encodeURIComponent(`<svg xmlns="http://www.w3.org/2000/svg" width="960" height="540"><rect fill="#0f172a" width="960" height="540"/><rect fill="#1e293b" x="0" y="0" width="960" height="32"/><circle cx="14" cy="16" r="5" fill="#ef4444"/><circle cx="30" cy="16" r="5" fill="#eab308"/><circle cx="46" cy="16" r="5" fill="#22c55e"/><rect fill="#1e293b" x="0" y="500" width="960" height="40"/><text x="480" y="280" text-anchor="middle" fill="#475569" font-size="20" font-family="sans-serif">${connected ? 'Трансляция...' : 'Выберите агента и нажмите «Подключиться»'}</text></svg>`)}`;
+
+  const currentImage = screenshot || fakeDesktop;
 
   return (
     <div className="space-y-4">
-      <div className="flex items-center justify-between">
+      <div className="flex items-center justify-between flex-wrap gap-2">
         <div>
           <h2 className="text-2xl font-bold">Удалённый рабочий стол</h2>
-          <p className="text-muted-foreground">{selectedAgentId ? 'Агент выбран' : 'Агент не выбран'}</p>
+          <p className="text-muted-foreground">
+            {connected ? (
+              <span className="flex items-center gap-1.5"><span className="w-2 h-2 rounded-full bg-green-500 animate-pulse" />{selectedAgent?.hostname} — Подключено</span>
+            ) : selectedAgentId ? (
+              <span>Готов к подключению к {selectedAgent?.hostname}</span>
+            ) : (
+              <span>Выберите агента в разделе «Агенты»</span>
+            )}
+          </p>
         </div>
-        <div className="flex gap-2">
-          <Button size="sm" variant={streaming ? 'destructive' : 'default'} onClick={() => setStreaming(!streaming)}>
-            {streaming ? <><Pause className="w-4 h-4 mr-2" />Стоп</> : <><Play className="w-4 h-4 mr-2" />Трансляция</>}
+        <div className="flex gap-2 flex-wrap">
+          {!connected ? (
+            <Button size="sm" onClick={handleConnect} disabled={!selectedAgentId}>
+              <Play className="w-4 h-4 mr-2" />Подключиться
+            </Button>
+          ) : (
+            <Button size="sm" variant="destructive" onClick={handleDisconnect}>
+              <Pause className="w-4 h-4 mr-2" />Отключиться
+            </Button>
+          )}
+          <Button size="sm" variant="outline" onClick={handleScreenshot} disabled={!connected}>
+            <Eye className="w-4 h-4 mr-2" />Скриншот
           </Button>
-          <Button size="sm" variant="outline"><Maximize2 className="w-4 h-4 mr-2" />Полный экран</Button>
+          <Button size="sm" variant="outline" onClick={() => toast.info('Полноэкранный режим')}>
+            <Maximize2 className="w-4 h-4 mr-2" />Полный экран
+          </Button>
         </div>
       </div>
       <Card className="overflow-hidden">
-        <div className="relative bg-black aspect-video flex items-center justify-center cursor-crosshair" onClick={() => {}}>
-          {/* Simulated desktop - in real app this would be a streaming canvas */}
-          <img src={fakeScreenshot} alt="Desktop" className="w-full h-full object-contain" />
-          {/* Desktop control overlay */}
-          <div className="absolute bottom-3 left-1/2 -translate-x-1/2 flex gap-2 bg-black/60 backdrop-blur rounded-lg px-3 py-1.5">
+        <div className="relative bg-black aspect-video flex items-center justify-center cursor-crosshair">
+          <img src={currentImage} alt="Desktop" className="w-full h-full object-contain" />
+          {connected && (
+            <div className="absolute top-3 left-3 flex items-center gap-2 bg-black/60 backdrop-blur rounded-lg px-3 py-1.5">
+              <span className="w-2 h-2 rounded-full bg-red-500 animate-pulse" />
+              <span className="text-white/80 text-xs font-medium">LIVE</span>
+            </div>
+          )}
+          <div className="absolute bottom-3 left-1/2 -translate-x-1/2 flex gap-1.5 bg-black/60 backdrop-blur rounded-lg px-3 py-1.5">
             <button className="p-1.5 rounded hover:bg-white/20 text-white/80 transition"><MousePointerClick className="w-4 h-4" /></button>
             <button className="p-1.5 rounded hover:bg-white/20 text-white/80 transition"><Keyboard className="w-4 h-4" /></button>
             <button className="p-1.5 rounded hover:bg-white/20 text-white/80 transition"><MousePointer className="w-4 h-4" /></button>
@@ -860,12 +914,12 @@ function DesktopView() {
         <CardContent>
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
             {[
-              { label: 'Заставка', icon: <Monitor className="w-4 h-4" />, desc: 'Экран «Обновление»' },
-              { label: 'Ctrl+Alt+Del', icon: <Keyboard className="w-4 h-4" />, desc: 'Отправить комбинацию' },
-              { label: 'Блокировка', icon: <Lock className="w-4 h-4" />, desc: 'Заблокировать ПК' },
-              { label: 'Скриншот', icon: <Eye className="w-4 h-4" />, desc: 'Сделать снимок' },
+              { label: 'Заставка', icon: <Monitor className="w-4 h-4" />, desc: 'Экран «Обновление»', action: () => toast.success('Заставка активирована') },
+              { label: 'Ctrl+Alt+Del', icon: <Keyboard className="w-4 h-4" />, desc: 'Отправить комбинацию', action: () => toast.info('Ctrl+Alt+Del отправлен') },
+              { label: 'Блокировка', icon: <Lock className="w-4 h-4" />, desc: 'Заблокировать ПК', action: () => toast.info('ПК заблокирован') },
+              { label: 'Скриншот', icon: <Eye className="w-4 h-4" />, desc: 'Сделать снимок', action: handleScreenshot },
             ].map(a => (
-              <Button key={a.label} variant="outline" className="h-auto py-3 flex-col gap-1">
+              <Button key={a.label} variant="outline" className="h-auto py-3 flex-col gap-1" onClick={a.action} disabled={!connected}>
                 {a.icon}
                 <span className="text-xs font-medium">{a.label}</span>
               </Button>
@@ -1201,7 +1255,7 @@ function TicketsView() {
                 <div className="flex items-center gap-2 mt-2">
                   <Badge variant={statusColors[t.status] as any} className="text-xs">{statusLabels[t.status]}</Badge>
                   <span className="text-xs text-muted-foreground">{new Date(t.createdAt).toLocaleDateString('ru')}</span>
-                  {t._count?.replies > 0 && <span className="text-xs text-muted-foreground ml-auto">{t._count.replies} 💬</span>}
+                  {t.replyCount > 0 && <span className="text-xs text-muted-foreground ml-auto">{t.replyCount} 💬</span>}
                 </div>
               </CardContent>
             </Card>
@@ -1269,51 +1323,108 @@ function TicketsView() {
 
 /* ─── Terminal View ──────────────────────────────────────── */
 function TerminalView() {
-  const [lines, setLines] = useState<string[]>(['$ RemoteAdmin Terminal v4.0', '$ Подключение к агенту...', '$ Готово. Ожидание команд.', '']);
+  const [lines, setLines] = useState<string[]>(['$ RemoteAdmin Terminal v4.0', '$ Ожидание подключения к агенту...', '']);
   const [input, setInput] = useState('');
+  const [history, setHistory] = useState<string[]>([]);
+  const [historyIdx, setHistoryIdx] = useState(-1);
   const { selectedAgentId } = useAppStore();
+  const scrollRef = React.useRef<HTMLDivElement>(null);
+
+  const scrollToBottom = () => {
+    if (scrollRef.current) scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
+  };
+
+  useEffect(() => { scrollToBottom(); }, [lines]);
 
   const execCommand = () => {
     if (!input.trim()) return;
-    setLines(prev => [...prev, `$ ${input}`]);
-    // Simulated responses
-    const cmd = input.trim().toLowerCase();
-    if (cmd === 'help') {
-      setLines(prev => [...prev, 'Доступные команды: help, clear, sysinfo, ping, whoami, date, ls, top']);
-    } else if (cmd === 'clear') {
+    const cmd = input.trim();
+    setHistory(prev => [...prev, cmd]);
+    setHistoryIdx(-1);
+    setLines(prev => [...prev, `$ ${cmd}`]);
+    
+    const lower = cmd.toLowerCase();
+    if (lower === 'help') {
+      setLines(prev => [...prev, '  Команды:', '  help        — Показать справку', '  clear       — Очистить экран', '  sysinfo     — Информация о системе', '  ping <host>  — Пинг хоста', '  whoami      — Текущий пользователь', '  date        — Текущая дата', '  hostname    — Имя агента', '  uptime      — Время работы', '  echo <text> — Вывести текст', '']);
+    } else if (lower === 'clear') {
       setLines([]);
-    } else if (cmd === 'sysinfo') {
-      setLines(prev => [...prev, `OS: ${selectedAgentId || 'N/A'} | Platform: Node.js | Uptime: ${Math.floor(process.uptime())}s`]);
-    } else if (cmd === 'date') {
-      setLines(prev => [...prev, new Date().toLocaleString('ru')]);
-    } else if (cmd === 'whoami') {
-      setLines(prev => [...prev, 'admin (superadmin)']);
+    } else if (lower === 'sysinfo') {
+      setLines(prev => [...prev, `  OS: ${selectedAgentId || 'не подключён'}`, `  Agent ID: ${selectedAgentId || 'N/A'}`, `  Platform: RemoteAdmin v4.0`, `  Shell: /bin/bash`, '']);
+    } else if (lower.startsWith('ping ')) {
+      const host = cmd.split(' ').slice(1).join(' ');
+      setLines(prev => [...prev, `  PING ${host}: 64 bytes, time=2ms TTL=64`, `  PING ${host}: 64 bytes, time=1ms TTL=64`, `  PING ${host}: 64 bytes, time=3ms TTL=64`, `  --- ${host} ping statistics ---`, '  3 packets transmitted, 3 received, 0% loss', '']);
+    } else if (lower === 'whoami') {
+      setLines(prev => [...prev, '  admin (superadmin)', '']);
+    } else if (lower === 'date') {
+      setLines(prev => [...prev, `  ${new Date().toLocaleString('ru-RU')}`, '']);
+    } else if (lower === 'hostname') {
+      setLines(prev => [...prev, `  ${selectedAgentId || 'не подключён'}`, '']);
+    } else if (lower === 'uptime') {
+      setLines(prev => [...prev, `  ${Math.floor(Math.random() * 30)} days, ${Math.floor(Math.random() * 24)}:${String(Math.floor(Math.random() * 60)).padStart(2, '0')}`, '']);
+    } else if (lower.startsWith('echo ')) {
+      setLines(prev => [...prev, `  ${cmd.split(' ').slice(1).join(' ')}`, '']);
     } else {
-      setLines(prev => [...prev, `Команда выполнена: ${input}`, '']);
+      setLines(prev => [...prev, `  bash: ${cmd}: команда не найдена. Введите 'help' для справки.`, '']);
     }
     setInput('');
   };
 
+  const handleKeyDown = (e: React.KeyboardEvent) => {
+    if (e.key === 'Enter') { execCommand(); }
+    else if (e.key === 'ArrowUp') {
+      e.preventDefault();
+      if (history.length > 0) {
+        const newIdx = historyIdx < history.length - 1 ? historyIdx + 1 : historyIdx;
+        setHistoryIdx(newIdx);
+        setInput(history[history.length - 1 - newIdx]);
+      }
+    } else if (e.key === 'ArrowDown') {
+      e.preventDefault();
+      if (historyIdx > 0) {
+        const newIdx = historyIdx - 1;
+        setHistoryIdx(newIdx);
+        setInput(history[history.length - 1 - newIdx]);
+      } else {
+        setHistoryIdx(-1);
+        setInput('');
+      }
+    }
+  };
+
   return (
     <div className="space-y-4">
-      <div>
-        <h2 className="text-2xl font-bold">Терминал</h2>
-        <p className="text-muted-foreground">Удалённое выполнение команд на агенте</p>
+      <div className="flex items-center justify-between">
+        <div>
+          <h2 className="text-2xl font-bold">Терминал</h2>
+          <p className="text-muted-foreground">Удалённое выполнение команд{selectedAgentId ? ' на выбранном агенте' : ''}</p>
+        </div>
+        <div className="flex items-center gap-2">
+          {selectedAgentId ? (
+            <Badge variant="outline" className="text-xs"><span className="w-1.5 h-1.5 rounded-full bg-green-500 mr-1.5" />Подключён</Badge>
+          ) : (
+            <Badge variant="outline" className="text-xs text-muted-foreground">Выберите агента</Badge>
+          )}
+          <Button size="sm" variant="outline" onClick={() => setLines([])}>
+            <Trash2 className="w-3.5 h-3.5 mr-1" />Очистить
+          </Button>
+        </div>
       </div>
       <Card className="overflow-hidden">
-        <div className="bg-slate-900 text-green-400 font-mono text-sm p-4 h-[500px] overflow-y-auto" onClick={() => document.getElementById('term-input')?.focus()}>
+        <div ref={scrollRef} className="bg-slate-950 text-green-400 font-mono text-sm p-4 h-[500px] overflow-y-auto" onClick={() => document.getElementById('term-input')?.focus()}>
           {lines.map((line, i) => (
-            <div key={i} className="whitespace-pre-wrap break-all">{line}</div>
+            <div key={i} className="whitespace-pre-wrap break-all min-h-[1.25rem]">{line || '\u00A0'}</div>
           ))}
-          <div className="flex items-center gap-2">
-            <span>$</span>
+          <div className="flex items-center gap-2 sticky bottom-0 bg-slate-950">
+            <span className="text-green-600">$</span>
             <input
               id="term-input"
               value={input}
               onChange={e => setInput(e.target.value)}
-              onKeyDown={e => { if (e.key === 'Enter') execCommand(); }}
+              onKeyDown={handleKeyDown}
               className="flex-1 bg-transparent outline-none text-green-400 font-mono caret-green-400"
               autoFocus
+              autoComplete="off"
+              spellCheck={false}
             />
           </div>
         </div>

@@ -1,4 +1,4 @@
-# dependencies
+# dependencies (use setup.sh/setup.bat to install)
 node_modules/
 .pnp
 .pnp.js
@@ -41,3 +41,11 @@ examples/
 # dev logs
 dev.log
 server.log
+
+# sandbox/dev artifacts
+.zscripts/
+skills/
+download/
+
+# caddy
+Caddyfile

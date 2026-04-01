@@ -137,7 +137,25 @@ RemoteAdmin-v4/
 - **npm** ≥ 9.x или **bun** ≥ 1.x
 - **Git**
 
-### Установка и запуск
+### Установка за 1 команду (рекомендуется)
+
+Скрипт автоматически установит все зависимости, инициализирует БД и заполнит тестовыми данными:
+
+```bash
+# Linux / macOS
+git clone https://github.com/Sitymax230/RemoteAdmin-v4.git
+cd RemoteAdmin-v4
+chmod +x setup.sh && ./setup.sh
+```
+
+```cmd
+REM Windows
+git clone https://github.com/Sitymax230/RemoteAdmin-v4.git
+cd RemoteAdmin-v4
+setup.bat
+```
+
+### Ручная установка
 
 ```bash
 # 1. Клонируйте репозиторий
